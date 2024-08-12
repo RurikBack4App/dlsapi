@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Data with Polling</title>
+    <link rel="stylesheet" href="../styles/uptown.css">
+    <!-- <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        th {
+            background-color: #f2f2f2;
+            text-align: left;
+        }
+    </style> -->
+</head>
+<body>
+    <header>
+        <h1>Monitoring System</h1>
+        <h2>Currently: Sensitech and Luxcross</h2>
+    </header>
+    <section class="full-width">
+        <article>
+            <div class="card">
+            <form id="param-form" class="columns seven" style="margin-bottom: 20px;">
+                <div class="row side-elements">
+                    <input type="text" id="param-input" placeholder="Enter the serialNumber" required>
+                    <div style="margin-left: 5px;">
+                        <label for="sensortype">Sensitech<input type="radio" name="sensor" value="sensitech" required></label>
+                        <label for="sensortype">Luxcross<input type="radio" name="sensor" value="luxcross" required></label>
+                    </div>
+                    <button type="submit">Submit</button>
+                </div>
+            </form>
+
+            <table id="data-table" border="1">
+                <thead >
+                    <tr>
+                        <th>Serial Number</th>
+                        <th>Program Name</th>
+                        <th>Sensor Type</th>
+                        <th>Temperature (High)</th>
+                        <th>Temperature (Ideal)</th>
+                        <th>Temperature (Current)</th>
+                        <th>Temperature (Low)</th>
+                        <th>Location (Longitude)</th>
+                        <th>Location (Latitude)</th>
+                        <th>Delete</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+</article>
+</section>
+    <script>
+        const pollingIntervals = {};
+
+        // Fetch and display all serial numbers on page load
+        async function fetchSerialNumbers() {
+            try {
+                const response = await fetch('http://localhost:3000/api/serialNumbers');
+                if (response.ok) {
+                    const data = await response.json();
+                   //console.log(data);
+                    const serialNumbers = data.serialNumbers;
+                    //console.log("serialNums :"+data.serialNumbers);
+                    serialNumbers.forEach(serialNumber => {
+                        //console.log(serialNumber);
+                        if (!document.getElementById(`row-${serialNumber}`)) {
+                            addRow(serialNumber);
+                            startPolling(serialNumber);
+                        }
+                    });
+                } else {
+                    console.error('Failed to fetch serial numbers');
+                }
+            } catch (error) {
+                console.error('Error fetching serial numbers:', error);
+            }
+        }
+
+        // Add a new row for the parameter
+        function addRow(paramValue) {
+            const tableBody = document.querySelector('#data-table tbody');
+            const row = document.createElement('tr');
+            
+            row.id = `row-${paramValue}`;
+            
+            const serialCell = document.createElement('td');
+            serialCell.textContent = paramValue;
+            row.appendChild(serialCell);
+            
+            const trackingCell = document.createElement('td');
+            trackingCell.id = `program_name-${paramValue}`;
+            row.appendChild(trackingCell);
+
+            const paramSensorCell = document.createElement('td');
+            paramSensorCell.id= `sensor_name-${paramValue}`;
+            row.appendChild(paramSensorCell);
+            
+            const tempCell_high = document.createElement('td');
+            tempCell_high.id = `temperature_high-${paramValue}`;
+            row.appendChild(tempCell_high);
+
+            const tempCell_ideal = document.createElement('td');
+            tempCell_ideal.id = `temperature_ideal-${paramValue}`;
+            row.appendChild(tempCell_ideal);
+
+            const tempCell_current = document.createElement('td');
+            tempCell_current.id = `temperature_current-${paramValue}`;
+            row.appendChild(tempCell_current);
+
+            const tempCell_low = document.createElement('td');
+            tempCell_low.id = `temperature_low-${paramValue}`;
+            row.appendChild(tempCell_low);
+            
+            const locationCell_long = document.createElement('td');
+            locationCell_long.id = `location_long-${paramValue}`;
+            row.appendChild(locationCell_long);
+
+            const locationCell_lat = document.createElement('td');
+            locationCell_lat.id = `location_lat-${paramValue}`;
+            row.appendChild(locationCell_lat);
+
+            const deleteCell = document.createElement('td');
+            const deleteButton = document.createElement('button');
+            deleteButton.classList.add("secondary");
+            deleteButton.classList.add("icon-trash");
+            // deleteButton.textContent = 'Delete';
+            deleteButton.addEventListener('click', () => deleteRow(paramValue));
+            deleteCell.appendChild(deleteButton);
+            row.appendChild(deleteCell);
+            
+            const statusCell = document.createElement('td');
+            statusCell.id = `status-${paramValue}`;
+            statusCell.textContent = 'Polling...';
+            row.appendChild(statusCell);
+
+            tableBody.appendChild(row);
+        }
+
+        function startPolling(paramValue, paramSensor) {
+                if (pollingIntervals[paramValue]) {
+                    clearInterval(pollingIntervals[paramValue]);
+                }
+
+                const pollData = async () => {
+                    try {
+                        const response = await fetch('http://localhost:3000/api/updates', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ serialNumber: paramValue, sensorType: paramSensor })
+                        });
+
+                        if (response.ok) {
+                            const responseData = await response.json();
+                            updateRow(paramValue, responseData.data);
+                        } else {
+                            console.error('Failed to fetch updated data');
+                            updateStatus(paramValue, 'Failed to update');
+                        }
+                    } catch (error) {
+                        console.error('Error during polling:', error);
+                        updateStatus(paramValue, 'Error');
+                    }
+                };
+
+                pollData(); // Fetch immediately
+
+                pollingIntervals[paramValue] = setInterval(async () => {
+                    // Check if the row still exists before polling
+                    if (document.getElementById(`row-${paramValue}`)) {
+                        await pollData();
+                    } else {
+                        clearInterval(pollingIntervals[paramValue]);
+                        delete pollingIntervals[paramValue];
+                        console.log(`Polling for ${paramValue} stopped as the row was deleted.`);
+                    }
+                }, 15000);
+    }
+
+    
+        // Delete the row
+        async function deleteRow(paramValue) {
+            // Stop polling for the row being deleted
+            if (pollingIntervals[paramValue]) {
+                clearInterval(pollingIntervals[paramValue]);
+                delete pollingIntervals[paramValue];
+            }
+
+
+            try {
+                const response = await fetch('http://localhost:3000/api/delete', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ serialNumber: paramValue })
+                });
+
+                if (response.ok) {
+                    document.getElementById(`row-${paramValue}`).remove();
+                    console.log(`Serial Number ${paramValue} deleted successfully.`);
+                } else {
+                    console.error('Failed to delete record');
+                }
+            } catch (error) {
+                console.error('Error during deletion:', error);
+            }
+        }
+        // Update the row with the new data
+        function updateRow(paramValue, data) {
+            //check for temp stats
+            let high = data.tempDetails.high;
+            let low = data.tempDetails.low;
+            let ideal = data.tempDetails.ideal;
+            let current = data.tempDetails.current;
+            //console.log(JSON.stringify(data.tempDetails));
+            if(current > high){
+                document.getElementById(`temperature_current-${paramValue}`).innerHTML = `<span class="tag red">${current}</span>`;
+             } else if(current < low){
+                document.getElementById(`temperature_current-${paramValue}`).innerHTML = `<span class="tag blue">${current}</span>`;
+             } else {
+                document.getElementById(`temperature_current-${paramValue}`).innerHTML = `<span class="tag green">${current}</span>`;
+             } 
+            document.getElementById(`program_name-${paramValue}`).textContent = JSON.stringify(data.trackingData.ProgramName, null, 2);
+            document.getElementById(`sensor_name-${paramValue}`).textContent = JSON.stringify(data.tempDetails.sensor, null, 2);
+            document.getElementById(`temperature_high-${paramValue}`).textContent = JSON.stringify(data.tempDetails.high, null, 2);
+            document.getElementById(`temperature_ideal-${paramValue}`).textContent = JSON.stringify(data.tempDetails.ideal, null, 2);
+            //document.getElementById(`temperature_current-${paramValue}`).textContent = JSON.stringify(data.tempDetails.current, null, 2);
+            document.getElementById(`temperature_low-${paramValue}`).textContent = JSON.stringify(data.tempDetails.low, null, 2);
+            document.getElementById(`location_long-${paramValue}`).textContent = JSON.stringify(data.currentLocation.long, null, 2);
+            document.getElementById(`location_lat-${paramValue}`).textContent = JSON.stringify(data.currentLocation.lat, null, 2);
+            updateStatus(paramValue, 'Updated');
+        }
+
+        // Update the status cell
+        function updateStatus(paramValue, status) {
+            document.getElementById(`status-${paramValue}`).textContent = status;
+        }
+
+        // Initialize by fetching serial numbers
+        fetchSerialNumbers();
+
+        // Form submission to add a new parameter
+        document.getElementById('param-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const paramValue = document.getElementById('param-input').value.trim();
+            const paramSensor = document.getElementById('param-form').elements['sensor'].value;
+            console.log(paramSensor);
+            if (!document.getElementById(`row-${paramValue}`)) {
+                addRow(paramValue,paramSensor);
+                startPolling(paramValue,paramSensor);
+            } else {
+                console.log(`Serial Number ${paramValue} is already being tracked.`);
+            }
+        });
+    </script>
+</body>
+</html>
