@@ -46,9 +46,9 @@ const monitorNetworkRequests = async (url) => {
             page.removeAllListeners('request');
         }
     });
-
-    await page.goto(url);
-    await page.waitForTimeout(10000);
+    
+    await page.goto(url , {waitUntil: "networkidle2", timeout: 70000});
+    //await page.waitForTimeout(10000);
     let extractedItems = {};
     if (recordedUrl) {
         extractedItems = new URLSearchParams(new URL(recordedUrl).search);
