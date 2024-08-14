@@ -48,7 +48,7 @@ const monitorNetworkRequests = async (url) => {
     });
 
     await page.goto(url);
-
+    await page.waitForTimeout(10000);
     let extractedItems = {};
     if (recordedUrl) {
         extractedItems = new URLSearchParams(new URL(recordedUrl).search);
