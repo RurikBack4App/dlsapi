@@ -33,8 +33,8 @@ const Tracking = mongoose.model('Tracking', trackingSchema);
 
 // Puppeteer function to monitor network requests
 const monitorNetworkRequests = async (url) => {
-    const browser = await puppeteer.launch({
-  args: ['--no-sandbox', '--disable-setuid-sandbox'], headless: true});
+    const browser = await puppeteer.launch({headless:true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox'],});
     const page = await browser.newPage();
 
     let recordedUrl = null;
