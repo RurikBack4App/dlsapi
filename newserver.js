@@ -84,17 +84,25 @@ const fetchData = async (serialNumber,dlsLoadNo='') => {
                     ProductID: null,
                     SensorType: "sensitech",
                     DLSLoadNo: dlsLoadNo
-                };
+                }
 
                 const baseUrl = 'https://tracks.sensitechccv.com/Sensitech.Web/PublicShipment/TripDetail/';
                 const queryString = `${extractedData.ShipmentID}?SerialNumber=${extractedData.SerialNumber}&ProgramID=${extractedData.ProgramID}&OrderNumber=${extractedData.OrderNumber}`;
 
                 const otherTrackingDetails = await monitorNetworkRequests(baseUrl + queryString);
-                extractedData.LocationID = otherTrackingDetails.get('locationID');
-                extractedData.ProductID = otherTrackingDetails.get('productID');
 
-                const newTracking = new Tracking(extractedData);
-                await newTracking.save();
+                let newTracking;
+                // use localhost
+                if(otherTrackingDetails){
+                    const trackingDetailsResp =  await axios.post('https://9d31-2401-4900-1caa-28f6-3d8e-caa1-8c3a-83d7.ngrok-free.app',{ serialNumber:serialNumber,dlsLoadNo:dlsLoadNo });
+                    newTracking = trackingDetailsResp.data
+                } else {
+                    extractedData.LocationID = otherTrackingDetails.get('locationID');
+                    extractedData.ProductID = otherTrackingDetails.get('productID');
+
+                    newTracking = new Tracking(extractedData);
+                    await newTracking.save();
+                }
 
                 return newTracking;
             }
@@ -367,16 +375,9 @@ app.post('/api/updates', async (req, res) => {
 
         if (sensor_type === 'sensitech') {
             //trackingData = await fetchData(serialNumber, dlsLoadNo);
-            let trackingResponse = await axios.post('http://localhost:5000/api/getsensidata', {
-                serialNumber : serialNumber,
-                dlsLoadNo : dlsLoadNo
-            })
-            trackingData = trackingResponse.data.trackingData;
+            trackingData = await fetchData(serialNumber,dlsLoadNo);
             if (!trackingData) {
-                trackingData = await fetchData(serialNumber,dlsLoadNo);
-                if (!trackingData){
-                    return res.status(404).json({ error: 'Tracking data not found for Sensitech' });
-                }   
+                    return res.status(404).json({ error: 'Tracking data not found for Sensitech' });  
             }
             //console.log("received tracking data from sensi: "+JSON.stringify(trackingData));
             tempData = await getTemperatureData(trackingData);
