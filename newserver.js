@@ -1,4 +1,4 @@
-require('dotenv').config();
+//require('dotenv').config();
 
 const express = require('express');
 const http = require('http');
@@ -9,7 +9,7 @@ const puppeteer = require('puppeteer');
 
 const app = express();
 const server = http.createServer(app);
-const port = process.env.PORT || 3000;
+const port = 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -93,7 +93,7 @@ const fetchData = async (serialNumber,dlsLoadNo='') => {
 
                 let newTracking;
                 // use localhost
-                if(otherTrackingDetails){
+                if(!otherTrackingDetails){
                     const trackingDetailsResp =  await axios.post('https://9d31-2401-4900-1caa-28f6-3d8e-caa1-8c3a-83d7.ngrok-free.app',{ serialNumber:serialNumber,dlsLoadNo:dlsLoadNo });
                     newTracking = trackingDetailsResp.data
                 } else {
